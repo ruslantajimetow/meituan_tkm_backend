@@ -1,0 +1,167 @@
+import uuid
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.models.store import MerchantType, Store, StoreImage, StoreStatus
+
+
+class StoreRepository:
+    def __init__(self, db: AsyncSession):
+        self._db = db
+
+    async def find_by_id(self, store_id: uuid.UUID) -> Store | None:
+        result = await self._db.execute(
+            select(Store)
+            .options(selectinload(Store.images))
+            .where(Store.id == store_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def find_by_owner(self, owner_id: uuid.UUID) -> Store | None:
+        result = await self._db.execute(
+            select(Store)
+            .options(selectinload(Store.images))
+            .where(Store.owner_id == owner_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def create(self, **kwargs) -> Store:
+        store = Store(**kwargs)
+        self._db.add(store)
+        await self._db.flush()
+        # Re-fetch with images loaded
+        return await self.find_by_id(store.id)
+
+    async def update(self, store: Store, **kwargs) -> Store:
+        update_data = {k: v for k, v in kwargs.items() if v is not None}
+        merged_attrs = {
+            "id": store.id,
+            "owner_id": store.owner_id,
+            "merchant_type": store.merchant_type,
+            "name": store.name,
+            "description": store.description,
+            "phone": store.phone,
+            "address": store.address,
+            "latitude": store.latitude,
+            "longitude": store.longitude,
+            "logo_url": store.logo_url,
+            "cover_image_url": store.cover_image_url,
+            "status": store.status,
+            "is_open": store.is_open,
+            "opening_time": store.opening_time,
+            "closing_time": store.closing_time,
+            "min_order": store.min_order,
+            "delivery_fee": store.delivery_fee,
+            "cuisine_type": store.cuisine_type,
+            "average_prep_time": store.average_prep_time,
+            "has_dine_in": store.has_dine_in,
+            "store_category": store.store_category,
+            "has_delivery_only": store.has_delivery_only,
+            "created_at": store.created_at,
+            **update_data,
+        }
+        updated = Store(**merged_attrs)
+        merged = await self._db.merge(updated)
+        await self._db.flush()
+        return await self.find_by_id(merged.id)
+
+    async def add_image(
+        self, store_id: uuid.UUID, image_url: str, thumbnail_url: str | None = None, sort_order: int = 0
+    ) -> StoreImage:
+        image = StoreImage(
+            store_id=store_id,
+            image_url=image_url,
+            thumbnail_url=thumbnail_url,
+            sort_order=sort_order,
+        )
+        self._db.add(image)
+        await self._db.flush()
+        return image
+
+    async def find_image(self, image_id: uuid.UUID, store_id: uuid.UUID) -> StoreImage | None:
+        result = await self._db.execute(
+            select(StoreImage).where(
+                StoreImage.id == image_id,
+                StoreImage.store_id == store_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def delete_image(self, image: StoreImage) -> None:
+        await self._db.delete(image)
+        await self._db.flush()
+
+    async def list_stores(
+        self,
+        *,
+        status: StoreStatus | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> list[Store]:
+        query = (
+            select(Store)
+            .options(selectinload(Store.images))
+            .offset(offset)
+            .limit(limit)
+            .order_by(Store.created_at.desc())
+        )
+        if status is not None:
+            query = query.where(Store.status == status)
+        result = await self._db.execute(query)
+        return list(result.scalars().all())
+
+    # --- Public browsing ---
+
+    def _public_filters(
+        self,
+        *,
+        merchant_type: MerchantType | None = None,
+        search: str | None = None,
+    ) -> list:
+        filters = [Store.status == StoreStatus.APPROVED]
+        if merchant_type is not None:
+            filters.append(Store.merchant_type == merchant_type)
+        if search:
+            filters.append(Store.name.ilike(f"%{search}%"))
+        return filters
+
+    async def list_public(
+        self,
+        *,
+        merchant_type: MerchantType | None = None,
+        search: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[Store]:
+        filters = self._public_filters(merchant_type=merchant_type, search=search)
+        query = (
+            select(Store)
+            .options(selectinload(Store.images))
+            .where(*filters)
+            .offset(offset)
+            .limit(limit)
+            .order_by(Store.is_open.desc(), Store.name)
+        )
+        result = await self._db.execute(query)
+        return list(result.scalars().all())
+
+    async def count_public(
+        self,
+        *,
+        merchant_type: MerchantType | None = None,
+        search: str | None = None,
+    ) -> int:
+        filters = self._public_filters(merchant_type=merchant_type, search=search)
+        query = select(func.count()).select_from(Store).where(*filters)
+        result = await self._db.execute(query)
+        return result.scalar_one()
+
+    async def find_public(self, store_id: uuid.UUID) -> Store | None:
+        result = await self._db.execute(
+            select(Store)
+            .options(selectinload(Store.images))
+            .where(Store.id == store_id, Store.status == StoreStatus.APPROVED)
+        )
+        return result.scalar_one_or_none()
