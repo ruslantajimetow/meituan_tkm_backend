@@ -95,7 +95,10 @@ class UserRepository:
     async def list_users(
         self, *, role: UserRole | None = None, offset: int = 0, limit: int = 20
     ) -> list[User]:
-        query = select(User).offset(offset).limit(limit).order_by(User.created_at.desc())
+        query = (
+            select(User).offset(offset).limit(limit).order_by(User.created_at.desc())
+        )
+        print(query)
         if role is not None:
             query = query.where(User.role == role)
         result = await self._db.execute(query)
