@@ -1,4 +1,8 @@
+import os
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -22,8 +26,8 @@ class Settings(BaseSettings):
 
     # SMS / OTP
     sms_provider: str = "mock"
-    unimtx_access_key_id: str = ""
-    unimtx_secret_key_id: str = ""
+    unimtx_access_key_id: str = os.getenv("UNIMTX_ACCESS_KEY_ID", "")
+    unimtx_secret_key_id: str = os.getenv("UNIMTX_SECRET_KEY_ID", "")
 
     # App
     app_env: str = "development"

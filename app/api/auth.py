@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.redis import get_redis
 from app.middleware.auth import get_current_user
+from app.models.notification import NotificationType
 from app.models.store import MerchantType
 from app.models.user import User, UserRole
 from app.repositories.store_repository import StoreRepository
@@ -23,6 +24,7 @@ from app.schemas.auth import (
     UserResponse,
 )
 from app.services.auth_service import AuthService
+from app.services.notification_service import NotificationService
 from app.services.otp_service import OtpService
 from app.services.sms_provider import get_otp_provider
 
@@ -120,7 +122,7 @@ async def register_complete(
             role=UserRole.MERCHANT,
         )
         store_repo = StoreRepository(db)
-        await store_repo.create(
+        store = await store_repo.create(
             owner_id=user_id,
             merchant_type=MerchantType(body.merchant_type),
             name=body.store_name,
@@ -133,6 +135,20 @@ async def register_complete(
             store_category=body.store_category,
             has_delivery_only=body.has_delivery_only,
         )
+
+        # Notify all admins about new store registration
+        user_repo = UserRepository(db)
+        admins = await user_repo.list_users(role=UserRole.ADMIN, limit=100)
+        if admins:
+            notifier = NotificationService(db)
+            await notifier.notify_many(
+                user_ids=[a.id for a in admins],
+                notification_type=NotificationType.STORE_REGISTERED,
+                title="New store registration",
+                body=f'"{body.store_name}" has registered and is awaiting approval.',
+                data={"store_id": str(store.id), "store_name": body.store_name},
+            )
+
         return tokens
 
     tokens, _ = await auth_service.complete_registration(

@@ -9,7 +9,12 @@ from app.middleware.auth import require_role
 from app.models.user import User, UserRole
 from app.repositories.store_repository import StoreRepository
 from app.schemas.auth import MessageResponse
-from app.schemas.store import StoreImageResponse, StoreResponse, StoreToggleRequest, StoreUpdateRequest
+from app.schemas.store import (
+    StoreImageResponse,
+    StoreResponse,
+    StoreToggleRequest,
+    StoreUpdateRequest,
+)
 
 router = APIRouter()
 

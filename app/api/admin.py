@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.middleware.auth import require_role
+from app.models.notification import NotificationType
 from app.models.store import StoreStatus
 from app.models.user import User, UserRole
 from app.repositories.store_repository import StoreRepository
@@ -12,6 +13,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.admin import StoreStatusUpdateRequest, UserActiveUpdateRequest
 from app.schemas.auth import MessageResponse, UserResponse
 from app.schemas.store import StoreResponse
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
 
@@ -56,7 +58,35 @@ async def update_store_status(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Store not found"
         )
-    return await repo.update(store, status=body.status)
+    updated_store = await repo.update(store, status=body.status)
+
+    # Notify the store owner about status change
+    if body.status in (StoreStatus.APPROVED, StoreStatus.REJECTED):
+        notifier = NotificationService(db)
+        if body.status == StoreStatus.APPROVED:
+            n_type = NotificationType.STORE_APPROVED
+            title = "Store approved!"
+            body_text = (
+                f'Your store "{store.name}" has been approved. '
+                "You can now add products and start receiving orders."
+            )
+        else:
+            n_type = NotificationType.STORE_REJECTED
+            title = "Store not approved"
+            body_text = (
+                f'Your store "{store.name}" was not approved. '
+                "Please contact support for details."
+            )
+
+        await notifier.notify(
+            user_id=store.owner_id,
+            notification_type=n_type,
+            title=title,
+            body=body_text,
+            data={"store_id": str(store.id), "status": body.status.value},
+        )
+
+    return updated_store
 
 
 @router.get("/users", response_model=list[UserResponse])
