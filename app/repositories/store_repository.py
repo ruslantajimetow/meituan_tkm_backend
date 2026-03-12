@@ -1,10 +1,11 @@
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.store import MerchantType, Store, StoreImage, StoreStatus
+from app.services.store_hours import current_tmt_time
 
 
 class StoreRepository:
@@ -97,6 +98,7 @@ class StoreRepository:
         self,
         *,
         status: StoreStatus | None = None,
+        search: str | None = None,
         offset: int = 0,
         limit: int = 20,
     ) -> list[Store]:
@@ -109,6 +111,8 @@ class StoreRepository:
         )
         if status is not None:
             query = query.where(Store.status == status)
+        if search:
+            query = query.where(Store.name.ilike(f"%{search}%"))
         result = await self._db.execute(query)
         return list(result.scalars().all())
 
@@ -136,13 +140,36 @@ class StoreRepository:
         limit: int = 50,
     ) -> list[Store]:
         filters = self._public_filters(merchant_type=merchant_type, search=search)
+        now = current_tmt_time()
+
+        # Compute open/closed at SQL level for ordering
+        # Normal hours: opening <= now < closing
+        normal_open = and_(
+            Store.opening_time <= now,
+            Store.closing_time > now,
+            Store.opening_time <= Store.closing_time,
+        )
+        # Overnight hours: now >= opening OR now < closing
+        overnight_open = and_(
+            Store.opening_time > Store.closing_time,
+            (Store.opening_time <= now) | (Store.closing_time > now),
+        )
+        has_hours = and_(
+            Store.opening_time.isnot(None),
+            Store.closing_time.isnot(None),
+        )
+        is_open_expr = case(
+            (and_(has_hours, normal_open | overnight_open), 1),
+            else_=0,
+        )
+
         query = (
             select(Store)
             .options(selectinload(Store.images))
             .where(*filters)
             .offset(offset)
             .limit(limit)
-            .order_by(Store.is_open.desc(), Store.name)
+            .order_by(is_open_expr.desc(), Store.name)
         )
         result = await self._db.execute(query)
         return list(result.scalars().all())

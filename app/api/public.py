@@ -9,7 +9,12 @@ from app.models.store import MerchantType
 from app.repositories.menu_repository import MenuRepository
 from app.repositories.store_repository import StoreRepository
 from app.schemas.menu import CategoryResponse, MenuItemResponse
-from app.schemas.public import PublicStoreDetail, PublicStorePaginatedResponse
+from app.schemas.public import (
+    PublicStoreDetail,
+    PublicStorePaginatedResponse,
+    SearchProductItem,
+    SearchResponse,
+)
 
 router = APIRouter()
 
@@ -31,6 +36,34 @@ async def list_stores(
         merchant_type=merchant_type, search=search,
     )
     return PublicStorePaginatedResponse(items=stores, total=total, offset=offset, limit=limit)
+
+
+@router.get("/search", response_model=SearchResponse)
+async def search(
+    q: str = Query("", min_length=1, max_length=100),
+    db: AsyncSession = Depends(get_db),
+):
+    store_repo = StoreRepository(db)
+    menu_repo = MenuRepository(db)
+
+    stores = await store_repo.list_public(search=q, limit=10)
+    product_rows = await menu_repo.search_public_products(q, limit=20)
+
+    products = [
+        SearchProductItem(
+            id=item.id,
+            store_id=item.store_id,
+            store_name=store_name,
+            name=item.name,
+            description=item.description,
+            price=float(item.price),
+            image_url=item.image_url,
+            thumbnail_url=item.thumbnail_url,
+        )
+        for item, store_name in product_rows
+    ]
+
+    return SearchResponse(stores=stores, products=products)
 
 
 @router.get("/stores/{store_id}", response_model=PublicStoreDetail)

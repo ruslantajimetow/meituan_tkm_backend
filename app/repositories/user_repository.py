@@ -127,13 +127,19 @@ class UserRepository:
         return merged
 
     async def list_users(
-        self, *, role: UserRole | None = None, offset: int = 0, limit: int = 20
+        self,
+        *,
+        role: UserRole | None = None,
+        search: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
     ) -> list[User]:
         query = (
             select(User).offset(offset).limit(limit).order_by(User.created_at.desc())
         )
-        print(query)
         if role is not None:
             query = query.where(User.role == role)
+        if search:
+            query = query.where(User.full_name.ilike(f"%{search}%"))
         result = await self._db.execute(query)
         return list(result.scalars().all())

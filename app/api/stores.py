@@ -12,7 +12,6 @@ from app.schemas.auth import MessageResponse
 from app.schemas.store import (
     StoreImageResponse,
     StoreResponse,
-    StoreToggleRequest,
     StoreUpdateRequest,
 )
 
@@ -44,23 +43,17 @@ async def update_my_store(
 ):
     store, repo = await _get_merchant_store(user, db)
     update_data = body.model_dump(exclude_unset=True)
-    updated = await repo.update(store, **update_data)
-    return updated
 
-
-@router.patch("/me/toggle", response_model=StoreResponse)
-async def toggle_store(
-    body: StoreToggleRequest,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
-    db: AsyncSession = Depends(get_db),
-):
-    store, repo = await _get_merchant_store(user, db)
-    if store.status.value != "approved":
+    # Validate that opening_time and closing_time come as a pair
+    has_opening = "opening_time" in update_data
+    has_closing = "closing_time" in update_data
+    if has_opening != has_closing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Store must be approved before opening",
+            detail="Both opening_time and closing_time must be provided together",
         )
-    updated = await repo.update(store, is_open=body.is_open)
+
+    updated = await repo.update(store, **update_data)
     return updated
 
 

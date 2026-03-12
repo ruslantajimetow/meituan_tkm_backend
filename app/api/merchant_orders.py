@@ -5,21 +5,36 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.middleware.auth import require_role
+from app.models.notification import NotificationType
 from app.models.order import OrderStatus
+from app.models.store import MerchantType
 from app.models.user import User, UserRole
 from app.repositories.order_repository import OrderRepository
 from app.repositories.store_repository import StoreRepository
 from app.schemas.order import OrderResponse, UpdateOrderStatusRequest
+from app.services.notification_service import NotificationService
+from app.services.print_service import print_order_receipt
 
 router = APIRouter()
 
-VALID_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
-    OrderStatus.PENDING: {OrderStatus.CONFIRMED, OrderStatus.CANCELLED},
-    OrderStatus.CONFIRMED: {OrderStatus.PREPARING, OrderStatus.CANCELLED},
-    OrderStatus.PREPARING: {OrderStatus.READY},
-    OrderStatus.READY: {OrderStatus.PICKED_UP},
-    OrderStatus.PICKED_UP: {OrderStatus.DELIVERED},
+RESTAURANT_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
+    OrderStatus.PENDING: {OrderStatus.RECEIVED, OrderStatus.CANCELLED},
+    OrderStatus.RECEIVED: {OrderStatus.PREPARING, OrderStatus.CANCELLED},
+    OrderStatus.PREPARING: {OrderStatus.SENT},
+    OrderStatus.SENT: {OrderStatus.DELIVERED},
 }
+
+STORE_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
+    OrderStatus.PENDING: {OrderStatus.RECEIVED, OrderStatus.CANCELLED},
+    OrderStatus.RECEIVED: {OrderStatus.SENT, OrderStatus.CANCELLED},
+    OrderStatus.SENT: {OrderStatus.DELIVERED},
+}
+
+
+def _get_transitions(merchant_type: MerchantType) -> dict[OrderStatus, set[OrderStatus]]:
+    if merchant_type == MerchantType.RESTAURANT:
+        return RESTAURANT_TRANSITIONS
+    return STORE_TRANSITIONS
 
 
 async def _get_merchant_store(user: User, db: AsyncSession):
@@ -33,6 +48,7 @@ async def _get_merchant_store(user: User, db: AsyncSession):
 @router.get("", response_model=list[OrderResponse])
 async def list_store_orders(
     order_status: OrderStatus | None = None,
+    search: str | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=50),
     user: User = Depends(require_role(UserRole.MERCHANT)),
@@ -40,7 +56,10 @@ async def list_store_orders(
 ):
     store = await _get_merchant_store(user, db)
     repo = OrderRepository(db)
-    return await repo.list_by_store(store.id, status=order_status, offset=offset, limit=limit)
+    orders = await repo.list_by_store(
+        store.id, status=order_status, search=search, offset=offset, limit=limit,
+    )
+    return [OrderResponse.from_order(o) for o in orders]
 
 
 @router.get("/{order_id}", response_model=OrderResponse)
@@ -54,7 +73,7 @@ async def get_store_order(
     order = await repo.find_by_id_and_store(order_id, store.id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-    return order
+    return OrderResponse.from_order(order)
 
 
 @router.patch("/{order_id}/status", response_model=OrderResponse)
@@ -70,11 +89,52 @@ async def update_order_status(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
 
-    allowed = VALID_TRANSITIONS.get(order.status, set())
+    transitions = _get_transitions(store.merchant_type)
+    allowed = transitions.get(order.status, set())
     if body.status not in allowed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot transition from '{order.status.value}' to '{body.status.value}'",
         )
 
-    return await repo.update_status(order, body.status)
+    updated = await repo.update_status(order, body.status)
+
+    # Notify customer of status change
+    notifier = NotificationService(db)
+    status_label = body.status.value.replace("_", " ").title()
+    await notifier.notify(
+        user_id=order.customer_id,
+        notification_type=NotificationType.ORDER_STATUS,
+        title="Order Update",
+        body=f"Your order is now {status_label}",
+        data={"order_id": str(order.id), "status": body.status.value},
+    )
+
+    return OrderResponse.from_order(updated)
+
+
+@router.post("/{order_id}/print", response_model=dict)
+async def reprint_order_receipt(
+    order_id: uuid.UUID,
+    user: User = Depends(require_role(UserRole.MERCHANT)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reprint a receipt for an order. Auto-receives the order if still PENDING."""
+    store = await _get_merchant_store(user, db)
+    repo = OrderRepository(db)
+    order = await repo.find_by_id_and_store(order_id, store.id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    if order.status == OrderStatus.CANCELLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot print receipt for a cancelled order",
+        )
+
+    printed = await print_order_receipt(order)
+
+    # Auto-receive if still pending and print succeeded
+    if printed and order.status == OrderStatus.PENDING:
+        await repo.update_status(order, OrderStatus.RECEIVED)
+
+    return {"printed": printed}

@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -20,14 +20,15 @@ router = APIRouter()
 
 @router.get("/stores", response_model=list[StoreResponse])
 async def list_stores(
-    store_status: StoreStatus | None = None,
+    store_status: StoreStatus | None = Query(None, alias="status"),
+    search: str | None = None,
     offset: int = 0,
     limit: int = 20,
     _user: User = Depends(require_role(UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
     repo = StoreRepository(db)
-    return await repo.list_stores(status=store_status, offset=offset, limit=limit)
+    return await repo.list_stores(status=store_status, search=search, offset=offset, limit=limit)
 
 
 @router.get("/stores/{store_id}", response_model=StoreResponse)
@@ -92,13 +93,14 @@ async def update_store_status(
 @router.get("/users", response_model=list[UserResponse])
 async def list_users(
     role: UserRole | None = None,
+    search: str | None = None,
     offset: int = 0,
     limit: int = 20,
     _user: User = Depends(require_role(UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
     repo = UserRepository(db)
-    return await repo.list_users(role=role, offset=offset, limit=limit)
+    return await repo.list_users(role=role, search=search, offset=offset, limit=limit)
 
 
 @router.patch("/users/{user_id}/active", response_model=MessageResponse)

@@ -67,3 +67,38 @@ class NotificationRepository:
         )
         await self._db.flush()
         return result.rowcount
+
+    async def mark_read_by_types(
+        self,
+        user_id: uuid.UUID,
+        types: list[NotificationType],
+    ) -> int:
+        result = await self._db.execute(
+            update(Notification)
+            .where(
+                Notification.user_id == user_id,
+                Notification.type.in_(types),
+                Notification.is_read.is_(False),
+            )
+            .values(is_read=True)
+        )
+        await self._db.flush()
+        return result.rowcount
+
+    async def mark_read_by_store(
+        self,
+        user_id: uuid.UUID,
+        store_id: uuid.UUID,
+    ) -> int:
+        result = await self._db.execute(
+            update(Notification)
+            .where(
+                Notification.user_id == user_id,
+                Notification.type == NotificationType.STORE_REGISTERED,
+                Notification.is_read.is_(False),
+                Notification.data.contains(str(store_id)),
+            )
+            .values(is_read=True)
+        )
+        await self._db.flush()
+        return result.rowcount

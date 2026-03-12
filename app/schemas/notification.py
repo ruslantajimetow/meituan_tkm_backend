@@ -25,3 +25,11 @@ class NotificationMarkReadRequest(BaseModel):
 
 class UnreadCountResponse(BaseModel):
     count: int
+
+
+class MarkReadByStoreRequest(BaseModel):
+    store_id: uuid.UUID
+
+
+class MarkReadByTypesRequest(BaseModel):
+    types: list[str]

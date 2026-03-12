@@ -12,6 +12,8 @@ from app.api.notifications import router as notifications_router
 from app.api.orders import router as orders_router
 from app.api.profile import router as profile_router
 from app.api.public import router as public_router
+from app.api.messages import router as messages_router
+from app.api.ratings import router as ratings_router
 from app.api.stores import router as stores_router
 from app.api.ws import router as ws_router
 from app.core.config import settings
@@ -48,6 +50,8 @@ app.include_router(merchant_orders_router, prefix="/api/stores/me/orders", tags=
 app.include_router(notifications_router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(addresses_router, prefix="/api/addresses", tags=["addresses"])
 app.include_router(profile_router, prefix="/api/profile", tags=["profile"])
+app.include_router(ratings_router, prefix="/api/ratings", tags=["ratings"])
+app.include_router(messages_router, prefix="/api/messages", tags=["messages"])
 app.include_router(ws_router, prefix="/api/ws")
 
 

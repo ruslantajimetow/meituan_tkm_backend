@@ -15,6 +15,11 @@ class NotificationType(str, enum.Enum):
     STORE_REJECTED = "store_rejected"
     ORDER_NEW = "order_new"
     ORDER_STATUS = "order_status"
+    ORDER_CANCELLED = "order_cancelled"
+    STORE_RATED = "store_rated"
+    PRODUCT_REVIEWED = "product_reviewed"
+    NEW_MESSAGE = "new_message"
+    REVIEW_REPLY = "review_reply"
 
 
 class Notification(Base):
@@ -24,7 +29,7 @@ class Notification(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True,
     )
-    type: Mapped[NotificationType] = mapped_column(Enum(NotificationType))
+    type: Mapped[NotificationType] = mapped_column(Enum(NotificationType, values_callable=lambda e: [x.value for x in e]))
     title: Mapped[str] = mapped_column(String(255))
     body: Mapped[str] = mapped_column(Text)
     data: Mapped[str | None] = mapped_column(Text)

@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     app_debug: bool = True
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Printing
+    print_agent_url: str = "http://host.docker.internal:9100"
+    print_enabled: bool = True
+
     # OTP
     otp_expire_minutes: int = 5
     otp_max_attempts: int = 5

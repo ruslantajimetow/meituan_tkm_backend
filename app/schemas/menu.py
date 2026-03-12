@@ -36,6 +36,7 @@ class MenuItemCreateRequest(BaseModel):
     portion_size: str | None = None
     is_spicy: bool | None = None
     allergens: list[str] | None = None
+    ingredients: list[str] | None = None
     # Store-only
     weight: float | None = Field(None, gt=0)
     unit: str | None = None
@@ -52,6 +53,7 @@ class MenuItemUpdateRequest(BaseModel):
     portion_size: str | None = None
     is_spicy: bool | None = None
     allergens: list[str] | None = None
+    ingredients: list[str] | None = None
     # Store-only
     weight: float | None = Field(None, gt=0)
     unit: str | None = None
@@ -60,6 +62,15 @@ class MenuItemUpdateRequest(BaseModel):
 
 class MenuItemStatusRequest(BaseModel):
     status: MenuItemStatus
+
+
+class MenuItemImageResponse(BaseModel):
+    id: uuid.UUID
+    image_url: str
+    thumbnail_url: str | None
+    sort_order: int
+
+    model_config = {"from_attributes": True}
 
 
 class MenuItemResponse(BaseModel):
@@ -77,10 +88,12 @@ class MenuItemResponse(BaseModel):
     portion_size: str | None
     is_spicy: bool | None
     allergens: list[str] | None
+    ingredients: list[str] | None
     # Store-only
     weight: float | None
     unit: str | None
     sku: str | None
+    images: list[MenuItemImageResponse] = []
     created_at: datetime
     updated_at: datetime
 

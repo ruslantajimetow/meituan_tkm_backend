@@ -8,7 +8,13 @@ from app.middleware.auth import get_current_user
 from app.models.user import User
 from app.repositories.notification_repository import NotificationRepository
 from app.schemas.auth import MessageResponse
-from app.schemas.notification import NotificationResponse, UnreadCountResponse
+from app.models.notification import NotificationType
+from app.schemas.notification import (
+    MarkReadByStoreRequest,
+    MarkReadByTypesRequest,
+    NotificationResponse,
+    UnreadCountResponse,
+)
 
 router = APIRouter()
 
@@ -55,4 +61,34 @@ async def mark_all_read(
 ):
     repo = NotificationRepository(db)
     count = await repo.mark_all_read(user.id)
+    return MessageResponse(message=f"Marked {count} notifications as read")
+
+
+@router.patch("/read-by-types", response_model=MessageResponse)
+async def mark_read_by_types(
+    body: MarkReadByTypesRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    repo = NotificationRepository(db)
+    valid_types = []
+    for t in body.types:
+        try:
+            valid_types.append(NotificationType(t))
+        except ValueError:
+            continue
+    if not valid_types:
+        return MessageResponse(message="No valid types provided")
+    count = await repo.mark_read_by_types(user.id, valid_types)
+    return MessageResponse(message=f"Marked {count} notifications as read")
+
+
+@router.patch("/read-by-store", response_model=MessageResponse)
+async def mark_read_by_store(
+    body: MarkReadByStoreRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    repo = NotificationRepository(db)
+    count = await repo.mark_read_by_store(user.id, body.store_id)
     return MessageResponse(message=f"Marked {count} notifications as read")

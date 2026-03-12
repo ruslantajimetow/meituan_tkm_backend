@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import enum
 import uuid
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -8,13 +11,22 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
+if TYPE_CHECKING:
+    from app.models.store import Store
+
+
+class SpiceLevel(str, enum.Enum):
+    NO_SPICE = "no_spice"
+    LITTLE_SPICE = "little_spice"
+    NORMAL = "normal"
+    EXTRA_SPICE = "extra_spice"
+
 
 class OrderStatus(str, enum.Enum):
     PENDING = "pending"
-    CONFIRMED = "confirmed"
+    RECEIVED = "received"
     PREPARING = "preparing"
-    READY = "ready"
-    PICKED_UP = "picked_up"
+    SENT = "sent"
     DELIVERED = "delivered"
     CANCELLED = "cancelled"
 
@@ -25,8 +37,11 @@ class Order(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     customer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
     store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id", ondelete="CASCADE"), index=True)
-    status: Mapped[OrderStatus] = mapped_column(Enum(OrderStatus), default=OrderStatus.PENDING, index=True)
+    status: Mapped[OrderStatus] = mapped_column(
+        Enum(OrderStatus), default=OrderStatus.PENDING, index=True,
+    )
 
+    customer_phone: Mapped[str] = mapped_column(String(20))
     delivery_address: Mapped[str] = mapped_column(Text)
     delivery_latitude: Mapped[float | None] = mapped_column(Numeric(10, 7))
     delivery_longitude: Mapped[float | None] = mapped_column(Numeric(10, 7))
@@ -41,7 +56,8 @@ class Order(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
-    items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    items: Mapped[list[OrderItem]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    store: Mapped[Store] = relationship(lazy="raise")
 
 
 class OrderItem(Base):
@@ -54,5 +70,6 @@ class OrderItem(Base):
     quantity: Mapped[int] = mapped_column(Integer)
     unit_price: Mapped[float] = mapped_column(Numeric(10, 2))
     total_price: Mapped[float] = mapped_column(Numeric(10, 2))
+    spice_level: Mapped[SpiceLevel | None] = mapped_column(Enum(SpiceLevel))
 
-    order: Mapped["Order"] = relationship(back_populates="items")
+    order: Mapped[Order] = relationship(back_populates="items")

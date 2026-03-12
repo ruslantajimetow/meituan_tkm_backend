@@ -33,6 +33,7 @@ class MenuItem(Base):
     portion_size: Mapped[str | None] = mapped_column(String(50))
     is_spicy: Mapped[bool | None] = mapped_column(Boolean)
     allergens: Mapped[list[str] | None] = mapped_column(ARRAY(String(100)))
+    ingredients: Mapped[list[str] | None] = mapped_column(ARRAY(String(200)))
 
     # Store-only fields
     weight: Mapped[float | None] = mapped_column(Numeric(10, 3))
@@ -43,3 +44,21 @@ class MenuItem(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     category: Mapped["MenuCategory | None"] = relationship(back_populates="items")
+    images: Mapped[list["MenuItemImage"]] = relationship(
+        back_populates="menu_item", cascade="all, delete-orphan", order_by="MenuItemImage.sort_order",
+    )
+
+
+class MenuItemImage(Base):
+    __tablename__ = "menu_item_images"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    menu_item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("menu_items.id", ondelete="CASCADE"), index=True,
+    )
+    image_url: Mapped[str] = mapped_column(String(500))
+    thumbnail_url: Mapped[str | None] = mapped_column(String(500))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+    menu_item: Mapped["MenuItem"] = relationship(back_populates="images")
