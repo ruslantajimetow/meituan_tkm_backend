@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import cast, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -14,7 +14,7 @@ class OrderRepository:
     async def _find(self, *filters) -> Order | None:
         result = await self._db.execute(
             select(Order)
-            .options(selectinload(Order.items))
+            .options(selectinload(Order.items), selectinload(Order.store))
             .where(*filters)
         )
         return result.scalar_one_or_none()
@@ -32,12 +32,13 @@ class OrderRepository:
         self,
         *filters,
         status: OrderStatus | None = None,
+        search: str | None = None,
         offset: int = 0,
         limit: int = 20,
     ) -> list[Order]:
         query = (
             select(Order)
-            .options(selectinload(Order.items))
+            .options(selectinload(Order.items), selectinload(Order.store))
             .where(*filters)
             .offset(offset)
             .limit(limit)
@@ -45,6 +46,8 @@ class OrderRepository:
         )
         if status is not None:
             query = query.where(Order.status == status)
+        if search:
+            query = query.where(cast(Order.id, String).ilike(f"%{search}%"))
         result = await self._db.execute(query)
         return list(result.scalars().all())
 
@@ -66,12 +69,13 @@ class OrderRepository:
         store_id: uuid.UUID,
         *,
         status: OrderStatus | None = None,
+        search: str | None = None,
         offset: int = 0,
         limit: int = 20,
     ) -> list[Order]:
         return await self._list(
             Order.store_id == store_id,
-            status=status, offset=offset, limit=limit,
+            status=status, search=search, offset=offset, limit=limit,
         )
 
     async def create(
@@ -79,6 +83,7 @@ class OrderRepository:
         *,
         customer_id: uuid.UUID,
         store_id: uuid.UUID,
+        customer_phone: str,
         delivery_address: str,
         delivery_latitude: float | None,
         delivery_longitude: float | None,
@@ -91,6 +96,7 @@ class OrderRepository:
         order = Order(
             customer_id=customer_id,
             store_id=store_id,
+            customer_phone=customer_phone,
             delivery_address=delivery_address,
             delivery_latitude=delivery_latitude,
             delivery_longitude=delivery_longitude,
@@ -120,6 +126,7 @@ class OrderRepository:
             "customer_id": order.customer_id,
             "store_id": order.store_id,
             "status": status,
+            "customer_phone": order.customer_phone,
             "delivery_address": order.delivery_address,
             "delivery_latitude": order.delivery_latitude,
             "delivery_longitude": order.delivery_longitude,

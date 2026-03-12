@@ -92,14 +92,54 @@ class UserRepository:
         await self._db.flush()
         return merged
 
+    async def update_email(self, user: User, email: str) -> User:
+        updated = User(
+            id=user.id,
+            phone=user.phone,
+            email=email,
+            password_hash=user.password_hash,
+            full_name=user.full_name,
+            role=user.role,
+            is_active=user.is_active,
+            phone_verified=user.phone_verified,
+            created_at=user.created_at,
+        )
+        merged = await self._db.merge(updated)
+        await self._db.flush()
+        return merged
+
+    async def update_phone(
+        self, user: User, phone: str, phone_verified: bool = True,
+    ) -> User:
+        updated = User(
+            id=user.id,
+            phone=phone,
+            email=user.email,
+            password_hash=user.password_hash,
+            full_name=user.full_name,
+            role=user.role,
+            is_active=user.is_active,
+            phone_verified=phone_verified,
+            created_at=user.created_at,
+        )
+        merged = await self._db.merge(updated)
+        await self._db.flush()
+        return merged
+
     async def list_users(
-        self, *, role: UserRole | None = None, offset: int = 0, limit: int = 20
+        self,
+        *,
+        role: UserRole | None = None,
+        search: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
     ) -> list[User]:
         query = (
             select(User).offset(offset).limit(limit).order_by(User.created_at.desc())
         )
-        print(query)
         if role is not None:
             query = query.where(User.role == role)
+        if search:
+            query = query.where(User.full_name.ilike(f"%{search}%"))
         result = await self._db.execute(query)
         return list(result.scalars().all())

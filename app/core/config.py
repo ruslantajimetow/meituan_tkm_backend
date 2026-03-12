@@ -1,4 +1,8 @@
+import os
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -22,13 +26,17 @@ class Settings(BaseSettings):
 
     # SMS / OTP
     sms_provider: str = "mock"
-    unimtx_access_key_id: str = ""
-    unimtx_secret_key_id: str = ""
+    unimtx_access_key_id: str = os.getenv("UNIMTX_ACCESS_KEY_ID", "")
+    unimtx_secret_key_id: str = os.getenv("UNIMTX_SECRET_KEY_ID", "")
 
     # App
     app_env: str = "development"
     app_debug: bool = True
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    # Printing
+    print_agent_url: str = "http://host.docker.internal:9100"
+    print_enabled: bool = True
 
     # OTP
     otp_expire_minutes: int = 5

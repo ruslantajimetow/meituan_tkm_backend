@@ -1,9 +1,10 @@
 import uuid
 from datetime import datetime, time
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.models.store import MerchantType, StoreStatus
+from app.services.store_hours import is_store_open
 
 
 class StoreUpdateRequest(BaseModel):
@@ -66,6 +67,10 @@ class StoreResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
-
-class StoreToggleRequest(BaseModel):
-    is_open: bool
+    @model_validator(mode="after")
+    def compute_is_open(self) -> "StoreResponse":
+        if self.opening_time is not None and self.closing_time is not None:
+            self.is_open = is_store_open(self.opening_time, self.closing_time)
+        else:
+            self.is_open = False
+        return self
