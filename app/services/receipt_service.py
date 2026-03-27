@@ -62,7 +62,7 @@ def generate_receipt_pdf(order: Order) -> bytes:
     )))
 
     # -- Order info --
-    order_id_short = str(order.id)[:8]
+    order_id_short = str(order.id)[-6:].upper()
     order_time = order.created_at.astimezone(TMT_TZ).strftime("%Y-%m-%d %H:%M")
     info_style = ParagraphStyle("Info", parent=styles["Normal"], fontSize=11, spaceAfter=2)
 
