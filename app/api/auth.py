@@ -14,6 +14,7 @@ from app.repositories.store_repository import StoreRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import (
     LoginRequest,
+    MerchantEmailRegisterRequest,
     MessageResponse,
     OtpSendRequest,
     OtpVerifyRequest,
@@ -94,6 +95,50 @@ async def verify_otp(
     }
 
 
+@router.post("/register/merchant", response_model=TokenResponse)
+async def register_merchant(
+    body: MerchantEmailRegisterRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    auth_service = AuthService(db)
+    tokens, user_id = await auth_service.register_merchant_with_email(
+        email=body.email,
+        password=body.password,
+        full_name=body.full_name,
+    )
+
+    store_repo = StoreRepository(db)
+    store = await store_repo.create(
+        owner_id=user_id,
+        merchant_type=MerchantType(body.merchant_type),
+        name=body.store_name,
+        address=body.address,
+        latitude=body.latitude,
+        longitude=body.longitude,
+        phone=body.store_phone,
+        description=body.description,
+        cuisine_type=body.cuisine_type,
+        average_prep_time=body.average_prep_time,
+        has_dine_in=body.has_dine_in,
+        store_category=body.store_category,
+        has_delivery_only=body.has_delivery_only,
+    )
+
+    user_repo = UserRepository(db)
+    admins = await user_repo.list_users(role=UserRole.ADMIN, limit=100)
+    if admins:
+        notifier = NotificationService(db)
+        await notifier.notify_many(
+            user_ids=[a.id for a in admins],
+            notification_type=NotificationType.STORE_REGISTERED,
+            title="New store registration",
+            body=f'"{body.store_name}" has registered and is awaiting approval.',
+            data={"store_id": str(store.id), "store_name": body.store_name},
+        )
+
+    return tokens
+
+
 @router.post("/register/complete", response_model=TokenResponse)
 async def register_complete(
     body: RegisterCompleteRequest,
@@ -127,6 +172,8 @@ async def register_complete(
             merchant_type=MerchantType(body.merchant_type),
             name=body.store_name,
             address=body.address,
+            latitude=body.latitude,
+            longitude=body.longitude,
             phone=body.store_phone,
             description=body.description,
             cuisine_type=body.cuisine_type,

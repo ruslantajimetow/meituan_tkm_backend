@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     app_debug: bool = True
-    cors_origins: list[str] = ["http://localhost:3000"]
+    cors_origins: list[str] = ["http://localhost:3000", "http://192.168.100.223:3000"]
 
     # Printing
     print_agent_url: str = "http://host.docker.internal:9100"

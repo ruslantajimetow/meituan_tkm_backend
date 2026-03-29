@@ -14,6 +14,8 @@ class PublicStoreListItem(BaseModel):
     name: str
     description: str | None
     address: str
+    latitude: float | None
+    longitude: float | None
     logo_url: str | None
     cover_image_url: str | None
     is_open: bool
@@ -33,6 +35,17 @@ class PublicStoreListItem(BaseModel):
         else:
             self.is_open = False
         return self
+
+
+class NearbyStoreListItem(PublicStoreListItem):
+    distance_km: float | None = None
+
+
+class NearbyStorePaginatedResponse(BaseModel):
+    items: list[NearbyStoreListItem]
+    total: int
+    offset: int
+    limit: int
 
 
 class PublicStoreDetail(PublicStoreListItem):

@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.menu_item import MenuItem
 from app.models.rating import ProductReview, StoreRating
 
 
@@ -144,3 +145,30 @@ class RatingRepository:
         )
         row = result.one()
         return float(row[0]), row[1]
+
+    async def list_store_reviews(
+        self,
+        store_id: uuid.UUID,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> list[tuple[ProductReview, str]]:
+        """Return all product reviews for a store joined with item name, newest first."""
+        result = await self._db.execute(
+            select(ProductReview, MenuItem.name)
+            .join(MenuItem, ProductReview.menu_item_id == MenuItem.id)
+            .where(MenuItem.store_id == store_id)
+            .order_by(ProductReview.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(result.tuples().all())
+
+    async def count_store_reviews(self, store_id: uuid.UUID) -> int:
+        result = await self._db.execute(
+            select(func.count())
+            .select_from(ProductReview)
+            .join(MenuItem, ProductReview.menu_item_id == MenuItem.id)
+            .where(MenuItem.store_id == store_id)
+        )
+        return result.scalar_one()

@@ -39,6 +39,9 @@ class RegisterCompleteRequest(BaseModel):
     store_name: str | None = Field(None, min_length=1, max_length=255)
     merchant_type: str | None = Field(None, pattern=r"^(restaurant|store)$")
     address: str | None = None
+    # Store location (optional but strongly recommended)
+    latitude: float | None = Field(None, ge=-90, le=90)
+    longitude: float | None = Field(None, ge=-180, le=180)
     store_phone: str | None = None
     description: str | None = None
     # Restaurant-only
@@ -54,6 +57,29 @@ class RegisterCompleteRequest(BaseModel):
     def merchant_fields_required(cls, v, info):
         # These are validated at the route level based on role
         return v
+
+
+class MerchantEmailRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    full_name: str = Field(min_length=1, max_length=255)
+    # Store fields (required)
+    store_name: str = Field(min_length=1, max_length=255)
+    merchant_type: str = Field(pattern=r"^(restaurant|store)$")
+    address: str = Field(min_length=1)
+    # Store location (optional but strongly recommended)
+    latitude: float | None = Field(None, ge=-90, le=90)
+    longitude: float | None = Field(None, ge=-180, le=180)
+    # Store fields (optional)
+    store_phone: str | None = None
+    description: str | None = None
+    # Restaurant-only
+    cuisine_type: str | None = None
+    average_prep_time: int | None = None
+    has_dine_in: bool | None = None
+    # Store-only
+    store_category: str | None = None
+    has_delivery_only: bool | None = None
 
 
 class RefreshTokenRequest(BaseModel):

@@ -18,6 +18,7 @@ from app.schemas.rating import (
     ProductReviewCreateRequest,
     ProductReviewResponse,
     ProductReviewSummary,
+    StoreProductReviewResponse,
     StoreRatingCreateRequest,
     StoreRatingResponse,
     StoreRatingSummary,
@@ -181,6 +182,23 @@ async def get_my_product_review(
     db: AsyncSession = Depends(get_db),
 ):
     return await RatingRepository(db).find_product_review(user.id, item_id)
+
+
+# --- Store Reviews (merchant view) ---
+
+
+@router.get("/stores/{store_id}/reviews", response_model=list[StoreProductReviewResponse])
+async def list_store_reviews(
+    store_id: uuid.UUID,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    rows = await RatingRepository(db).list_store_reviews(store_id, offset=offset, limit=limit)
+    return [
+        StoreProductReviewResponse.model_validate({**review.__dict__, "item_name": item_name})
+        for review, item_name in rows
+    ]
 
 
 # --- Merchant Reply ---

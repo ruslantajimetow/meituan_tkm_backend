@@ -23,6 +23,25 @@ class AuthService:
         self._user_repo = UserRepository(db)
         self._token_repo = TokenRepository(db)
 
+    async def register_merchant_with_email(
+        self, *, email: str, password: str, full_name: str
+    ) -> tuple[TokenResponse, uuid.UUID]:
+        existing = await self._user_repo.find_by_email(email)
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Email already registered",
+            )
+
+        user = await self._user_repo.create(
+            email=email,
+            password_hash=hash_password(password),
+            full_name=full_name,
+            role=UserRole.MERCHANT,
+        )
+        tokens = await self._issue_tokens(user.id, user.role)
+        return tokens, user.id
+
     async def register_with_email(
         self, *, email: str, password: str, full_name: str
     ) -> TokenResponse:

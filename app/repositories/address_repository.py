@@ -37,6 +37,10 @@ class AddressRepository:
         label: str,
         address_line: str,
         is_default: bool = False,
+        flat_number: str | None = None,
+        house_number: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> Address:
         # If this is the first address or explicitly default, unset others
         existing_count = await self.count_by_user(user_id)
@@ -50,6 +54,10 @@ class AddressRepository:
             label=label,
             address_line=address_line,
             is_default=should_be_default,
+            flat_number=flat_number,
+            house_number=house_number,
+            latitude=latitude,
+            longitude=longitude,
         )
         self._db.add(address)
         await self._db.flush()
@@ -61,14 +69,20 @@ class AddressRepository:
         *,
         label: str | None = None,
         address_line: str | None = None,
+        flat_number: str | None = None,
+        house_number: str | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
     ) -> Address:
         updated = Address(
             id=address.id,
             user_id=address.user_id,
             label=label if label is not None else address.label,
-            address_line=(
-                address_line if address_line is not None else address.address_line
-            ),
+            address_line=(address_line if address_line is not None else address.address_line),
+            flat_number=flat_number if flat_number is not None else address.flat_number,
+            house_number=house_number if house_number is not None else address.house_number,
+            latitude=latitude if latitude is not None else address.latitude,
+            longitude=longitude if longitude is not None else address.longitude,
             is_default=address.is_default,
             created_at=address.created_at,
         )

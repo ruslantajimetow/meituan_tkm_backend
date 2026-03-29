@@ -10,6 +10,8 @@ from app.repositories.menu_repository import MenuRepository
 from app.repositories.store_repository import StoreRepository
 from app.schemas.menu import CategoryResponse, MenuItemResponse
 from app.schemas.public import (
+    NearbyStorePaginatedResponse,
+    NearbyStoreListItem,
     PublicStoreDetail,
     PublicStorePaginatedResponse,
     SearchProductItem,
@@ -21,21 +23,81 @@ router = APIRouter()
 MAX_LIMIT = 50
 
 
+@router.get("/categories", response_model=list[str])
+async def list_categories(
+    merchant_type: MerchantType,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return distinct category values for approved stores of the given merchant type."""
+    return await StoreRepository(db).list_distinct_categories(merchant_type)
+
+
 @router.get("/stores", response_model=PublicStorePaginatedResponse)
 async def list_stores(
     merchant_type: MerchantType | None = None,
     search: str | None = None,
+    cuisine_type: str | None = None,
+    store_category: str | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=MAX_LIMIT),
     db: AsyncSession = Depends(get_db),
 ):
     repo = StoreRepository(db)
     stores, total = await repo.list_public(
-        merchant_type=merchant_type, search=search, offset=offset, limit=limit,
+        merchant_type=merchant_type,
+        search=search,
+        cuisine_type=cuisine_type,
+        store_category=store_category,
+        offset=offset,
+        limit=limit,
     ), await repo.count_public(
-        merchant_type=merchant_type, search=search,
+        merchant_type=merchant_type,
+        search=search,
+        cuisine_type=cuisine_type,
+        store_category=store_category,
     )
     return PublicStorePaginatedResponse(items=stores, total=total, offset=offset, limit=limit)
+
+
+@router.get("/stores/nearby", response_model=NearbyStorePaginatedResponse)
+async def list_nearby_stores(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    radius_km: float = Query(50.0, ge=1, le=200),
+    merchant_type: MerchantType | None = None,
+    search: str | None = None,
+    cuisine_type: str | None = None,
+    store_category: str | None = None,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=MAX_LIMIT),
+    db: AsyncSession = Depends(get_db),
+):
+    repo = StoreRepository(db)
+    rows = await repo.list_nearby(
+        lat=lat,
+        lng=lng,
+        radius_km=radius_km,
+        merchant_type=merchant_type,
+        search=search,
+        cuisine_type=cuisine_type,
+        store_category=store_category,
+        offset=offset,
+        limit=limit,
+    )
+    total = await repo.count_nearby(
+        lat=lat,
+        lng=lng,
+        radius_km=radius_km,
+        merchant_type=merchant_type,
+        search=search,
+        cuisine_type=cuisine_type,
+        store_category=store_category,
+    )
+    items = [
+        NearbyStoreListItem.model_validate({**store.__dict__, "distance_km": distance_km})
+        for store, distance_km in rows
+    ]
+    return NearbyStorePaginatedResponse(items=items, total=total, offset=offset, limit=limit)
 
 
 @router.get("/search", response_model=SearchResponse)
