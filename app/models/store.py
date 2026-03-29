@@ -55,6 +55,7 @@ class Store(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     images: Mapped[list["StoreImage"]] = relationship(back_populates="store", cascade="all, delete-orphan", order_by="StoreImage.sort_order")
+    documents: Mapped[list["StoreDocument"]] = relationship(back_populates="store", cascade="all, delete-orphan", order_by="StoreDocument.created_at")  # type: ignore[name-defined]
 
 
 class StoreImage(Base):

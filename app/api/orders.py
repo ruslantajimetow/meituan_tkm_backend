@@ -117,7 +117,7 @@ async def create_order(
         user_id=store.owner_id,
         notification_type=NotificationType.ORDER_NEW,
         title="New Order",
-        body=f"New order #{str(order.id)[:8]} received",
+        body=f"New order #{str(order.id)[-6:].upper()} received",
         data={"order_id": str(order.id)},
     )
 
@@ -178,7 +178,7 @@ async def cancel_order(
         user_id=order.store.owner_id,
         notification_type=NotificationType.ORDER_CANCELLED,
         title="Order Cancelled",
-        body=f"Order #{str(order.id)[:8]} was cancelled by customer",
+        body=f"Order #{str(order.id)[-6:].upper()} was cancelled by customer",
         data={"order_id": str(order.id), "reason": body.reason},
     )
 

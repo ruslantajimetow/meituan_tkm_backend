@@ -3,13 +3,17 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi import Form
+
 from app.core.database import get_db
-from app.core.storage import delete_image, upload_image, validate_image
+from app.core.storage import delete_image, upload_document, upload_image, validate_document, validate_image
 from app.middleware.auth import require_role
+from app.models.store_document import DocumentType, StoreDocument
 from app.models.user import User, UserRole
 from app.repositories.store_repository import StoreRepository
 from app.schemas.auth import MessageResponse
 from app.schemas.store import (
+    StoreDocumentResponse,
     StoreImageResponse,
     StoreResponse,
     StoreUpdateRequest,
@@ -128,3 +132,39 @@ async def delete_gallery_image(
     delete_image(image.image_url)
     await repo.delete_image(image)
     return MessageResponse(message="Image deleted")
+
+
+# --- Store Documents ---
+
+
+@router.get("/me/documents", response_model=list[StoreDocumentResponse])
+async def list_store_documents(
+    user: User = Depends(require_role(UserRole.MERCHANT)),
+    db: AsyncSession = Depends(get_db),
+):
+    store, _ = await _get_merchant_store(user, db)
+    from sqlalchemy import select
+    result = await db.execute(
+        select(StoreDocument).where(StoreDocument.store_id == store.id).order_by(StoreDocument.created_at)
+    )
+    return list(result.scalars().all())
+
+
+@router.post("/me/documents", response_model=StoreDocumentResponse, status_code=status.HTTP_201_CREATED)
+async def upload_store_document(
+    file: UploadFile,
+    document_type: DocumentType = Form(...),
+    user: User = Depends(require_role(UserRole.MERCHANT)),
+    db: AsyncSession = Depends(get_db),
+):
+    store, _ = await _get_merchant_store(user, db)
+    content = await file.read()
+    error = validate_document(file.content_type, len(content))
+    if error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+
+    file_url = upload_document(content, file.content_type, f"stores/{store.id}/documents")
+    doc = StoreDocument(store_id=store.id, document_type=document_type, file_url=file_url)
+    db.add(doc)
+    await db.flush()
+    return doc

@@ -8,6 +8,7 @@ from app.models.otp_code import OtpCode
 from app.models.rating import ProductReview, StoreRating
 from app.models.refresh_token import RefreshToken
 from app.models.store import MerchantType, Store, StoreImage, StoreStatus
+from app.models.store_document import DocumentStatus, DocumentType, StoreDocument
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -20,6 +21,9 @@ __all__ = [
     "Store",
     "StoreImage",
     "StoreStatus",
+    "StoreDocument",
+    "DocumentType",
+    "DocumentStatus",
     "MenuCategory",
     "MenuItem",
     "MenuItemImage",

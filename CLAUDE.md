@@ -71,6 +71,7 @@ middleware/   → Auth dependencies (get_current_user, require_role)
 | `Notification` | id, user_id, type, title, body, data (JSON), is_read | NotificationType enum |
 | `StoreRating` | id, user_id, store_id, stars | Upsert per user+store pair (1-5 stars) |
 | `ProductReview` | id, user_id, menu_item_id, stars, text, image_url, merchant_reply, replied_at | Upsert per user+item. Merchant can reply once |
+| `StoreDocument` | id, store_id, document_type, file_url, status | License/permit uploads. Types: business_registration, food_safety_permit, tax_registration, store_photo. Status: pending, approved, rejected |
 | `Conversation` | id, customer_id, store_id, last_message_at | One per customer+store pair, auto-created |
 | `Message` | id, conversation_id, sender_id, text, is_read | Chat messages between customer and merchant |
 | `Address` | id, user_id, label, address_line, is_default | Multiple per user with default tracking |
@@ -160,6 +161,11 @@ Valid transitions enforced in `merchant_orders.py`. Orders snapshot menu item pr
 - `NEW_MESSAGE` — sent to recipient when a chat message is sent
 - `REVIEW_REPLY` — sent to customer when merchant replies to their review
 
+**Notification mark-read variants:**
+- `PATCH /api/notifications/{id}/read` — mark single notification read
+- `PATCH /api/notifications/read-all` — mark all read
+- `PATCH /api/notifications/read-by-types` — mark read by type array `{ types: string[] }` (used by webmerchant Reviews page to clear `store_rated`/`product_reviewed` badges)
+
 ### Ratings & Reviews
 
 - **Store ratings**: Customers rate stores 1-5 stars (upsert per user+store). Summary endpoint returns average + count.
@@ -209,13 +215,14 @@ Real-time chat between customers and merchants:
 | Prefix | Auth | Purpose |
 |--------|------|---------|
 | `/api/auth/*` | None/Bearer | Registration, login, OTP, token refresh, logout |
-| `/api/public/*` | None | Store browsing for customers |
+| `/api/public/*` | None | Store browsing, search, and category listing for customers. `GET /api/public/categories?merchant_type=` returns distinct cuisine/store category strings from approved stores |
 | `/api/orders/*` | Customer | Customer order CRUD |
 | `/api/stores/me/*` | Merchant | Store settings, logo/cover/gallery, menu categories & items, merchant orders |
 | `/api/addresses/*` | Bearer | Customer address CRUD, set default |
 | `/api/profile/*` | Bearer | Update email, phone OTP send/verify |
 | `/api/admin/*` | Admin | Store approval/rejection/suspension, user management |
 | `/api/notifications/*` | Bearer | List, mark read (single/all/by store), unread count |
+| `/api/stores/me/documents` | Merchant | `GET` list store documents, `POST` upload document (multipart: file + document_type) |
 | `/api/ratings/*` | Bearer/None | Store ratings, product reviews, merchant replies, review image upload |
 | `/api/messages/*` | Bearer | Conversations (list, create), messages (list, send), mark read |
 | `/api/public/search` | None | Cross-store search for stores and products |

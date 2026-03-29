@@ -37,6 +37,10 @@ async def create_address(
         label=body.label,
         address_line=body.address_line,
         is_default=body.is_default,
+        flat_number=body.flat_number,
+        house_number=body.house_number,
+        latitude=body.latitude,
+        longitude=body.longitude,
     )
 
 
@@ -54,7 +58,13 @@ async def update_address(
             status_code=status.HTTP_404_NOT_FOUND, detail="Address not found",
         )
     return await repo.update(
-        address, label=body.label, address_line=body.address_line,
+        address,
+        label=body.label,
+        address_line=body.address_line,
+        flat_number=body.flat_number,
+        house_number=body.house_number,
+        latitude=body.latitude,
+        longitude=body.longitude,
     )
 
 

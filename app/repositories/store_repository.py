@@ -123,23 +123,47 @@ class StoreRepository:
         *,
         merchant_type: MerchantType | None = None,
         search: str | None = None,
+        cuisine_type: str | None = None,
+        store_category: str | None = None,
     ) -> list:
         filters = [Store.status == StoreStatus.APPROVED]
         if merchant_type is not None:
             filters.append(Store.merchant_type == merchant_type)
         if search:
             filters.append(Store.name.ilike(f"%{search}%"))
+        if cuisine_type:
+            filters.append(Store.cuisine_type == cuisine_type)
+        if store_category:
+            filters.append(Store.store_category == store_category)
         return filters
+
+    async def list_distinct_categories(self, merchant_type: MerchantType) -> list[str]:
+        """Return distinct non-null category values for approved stores of a given type."""
+        col = Store.cuisine_type if merchant_type == MerchantType.RESTAURANT else Store.store_category
+        result = await self._db.execute(
+            select(col)
+            .where(Store.status == StoreStatus.APPROVED, col.isnot(None))
+            .distinct()
+            .order_by(col)
+        )
+        return [row[0] for row in result.all()]
 
     async def list_public(
         self,
         *,
         merchant_type: MerchantType | None = None,
         search: str | None = None,
+        cuisine_type: str | None = None,
+        store_category: str | None = None,
         offset: int = 0,
         limit: int = 50,
     ) -> list[Store]:
-        filters = self._public_filters(merchant_type=merchant_type, search=search)
+        filters = self._public_filters(
+            merchant_type=merchant_type,
+            search=search,
+            cuisine_type=cuisine_type,
+            store_category=store_category,
+        )
         now = current_tmt_time()
 
         # Compute open/closed at SQL level for ordering
@@ -179,9 +203,139 @@ class StoreRepository:
         *,
         merchant_type: MerchantType | None = None,
         search: str | None = None,
+        cuisine_type: str | None = None,
+        store_category: str | None = None,
     ) -> int:
-        filters = self._public_filters(merchant_type=merchant_type, search=search)
+        filters = self._public_filters(
+            merchant_type=merchant_type,
+            search=search,
+            cuisine_type=cuisine_type,
+            store_category=store_category,
+        )
         query = select(func.count()).select_from(Store).where(*filters)
+        result = await self._db.execute(query)
+        return result.scalar_one()
+
+    async def list_nearby(
+        self,
+        *,
+        lat: float,
+        lng: float,
+        radius_km: float = 50.0,
+        merchant_type: MerchantType | None = None,
+        search: str | None = None,
+        cuisine_type: str | None = None,
+        store_category: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> list[tuple[Store, float | None]]:
+        filters = self._public_filters(
+            merchant_type=merchant_type,
+            search=search,
+            cuisine_type=cuisine_type,
+            store_category=store_category,
+        )
+
+        # Haversine distance expression (km). Clamp to [-1,1] to avoid acos domain errors.
+        haversine = (
+            6371.0
+            * func.acos(
+                func.least(
+                    1.0,
+                    func.greatest(
+                        -1.0,
+                        func.cos(func.radians(lat))
+                        * func.cos(func.radians(Store.latitude))
+                        * func.cos(func.radians(Store.longitude) - func.radians(lng))
+                        + func.sin(func.radians(lat))
+                        * func.sin(func.radians(Store.latitude)),
+                    ),
+                )
+            )
+        ).label("distance_km")
+
+        # NULL-coordinate stores sort last
+        has_coords = case(
+            (Store.latitude.is_(None), 1),
+            else_=0,
+        )
+
+        query = (
+            select(Store, haversine)
+            .options(selectinload(Store.images))
+            .where(
+                *filters,
+                # Only apply radius filter to stores with coords; include all NULL-coord stores
+                (Store.latitude.is_(None))
+                | (
+                    6371.0
+                    * func.acos(
+                        func.least(
+                            1.0,
+                            func.greatest(
+                                -1.0,
+                                func.cos(func.radians(lat))
+                                * func.cos(func.radians(Store.latitude))
+                                * func.cos(func.radians(Store.longitude) - func.radians(lng))
+                                + func.sin(func.radians(lat))
+                                * func.sin(func.radians(Store.latitude)),
+                            ),
+                        )
+                    )
+                    <= radius_km
+                ),
+            )
+            .order_by(has_coords, haversine)
+            .offset(offset)
+            .limit(limit)
+        )
+
+        result = await self._db.execute(query)
+        rows = result.all()
+        return [(row[0], float(row[1]) if row[1] is not None else None) for row in rows]
+
+    async def count_nearby(
+        self,
+        *,
+        lat: float,
+        lng: float,
+        radius_km: float = 50.0,
+        merchant_type: MerchantType | None = None,
+        search: str | None = None,
+        cuisine_type: str | None = None,
+        store_category: str | None = None,
+    ) -> int:
+        filters = self._public_filters(
+            merchant_type=merchant_type,
+            search=search,
+            cuisine_type=cuisine_type,
+            store_category=store_category,
+        )
+        query = (
+            select(func.count())
+            .select_from(Store)
+            .where(
+                *filters,
+                (Store.latitude.is_(None))
+                | (
+                    6371.0
+                    * func.acos(
+                        func.least(
+                            1.0,
+                            func.greatest(
+                                -1.0,
+                                func.cos(func.radians(lat))
+                                * func.cos(func.radians(Store.latitude))
+                                * func.cos(func.radians(Store.longitude) - func.radians(lng))
+                                + func.sin(func.radians(lat))
+                                * func.sin(func.radians(Store.latitude)),
+                            ),
+                        )
+                    )
+                    <= radius_km
+                ),
+            )
+        )
         result = await self._db.execute(query)
         return result.scalar_one()
 

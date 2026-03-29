@@ -17,6 +17,7 @@ s3_client = boto3.client(
 )
 
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_DOCUMENT_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 MAX_IMAGE_DIMENSION = 1200
 THUMBNAIL_DIMENSION = 300
@@ -68,6 +69,28 @@ def upload_image(image_bytes: bytes, folder: str) -> tuple[str, str]:
     image_url = f"{settings.s3_public_url}/{image_key}"
     thumb_url = f"{settings.s3_public_url}/{thumb_key}"
     return image_url, thumb_url
+
+
+def validate_document(content_type: str, size: int) -> str | None:
+    if content_type not in ALLOWED_DOCUMENT_TYPES:
+        return f"Invalid file type: {content_type}. Allowed: JPEG, PNG, WebP, PDF"
+    if size > MAX_FILE_SIZE:
+        return f"File too large: {size} bytes. Maximum: {MAX_FILE_SIZE} bytes"
+    return None
+
+
+def upload_document(file_bytes: bytes, content_type: str, folder: str) -> str:
+    """Upload a document file (image or PDF) without resizing. Returns public URL."""
+    file_id = uuid.uuid4().hex
+    ext = "pdf" if content_type == "application/pdf" else "jpg"
+    key = f"{folder}/{file_id}.{ext}"
+    s3_client.put_object(
+        Bucket=settings.s3_bucket_name,
+        Key=key,
+        Body=file_bytes,
+        ContentType=content_type,
+    )
+    return f"{settings.s3_public_url}/{key}"
 
 
 def delete_image(image_url: str) -> None:

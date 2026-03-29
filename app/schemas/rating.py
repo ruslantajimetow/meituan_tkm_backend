@@ -49,3 +49,8 @@ class ProductReviewSummary(BaseModel):
 
 class MerchantReplyRequest(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
+
+
+class StoreProductReviewResponse(ProductReviewResponse):
+    """ProductReview enriched with the menu item name — used in merchant review list."""
+    item_name: str

@@ -4,7 +4,19 @@ from datetime import datetime, time
 from pydantic import BaseModel, Field, model_validator
 
 from app.models.store import MerchantType, StoreStatus
+from app.models.store_document import DocumentStatus, DocumentType
 from app.services.store_hours import is_store_open
+
+
+class StoreDocumentResponse(BaseModel):
+    id: uuid.UUID
+    store_id: uuid.UUID
+    document_type: DocumentType
+    file_url: str
+    status: DocumentStatus
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class StoreUpdateRequest(BaseModel):
