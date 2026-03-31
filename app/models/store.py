@@ -56,6 +56,7 @@ class Store(Base):
 
     images: Mapped[list["StoreImage"]] = relationship(back_populates="store", cascade="all, delete-orphan", order_by="StoreImage.sort_order")
     documents: Mapped[list["StoreDocument"]] = relationship(back_populates="store", cascade="all, delete-orphan", order_by="StoreDocument.created_at")  # type: ignore[name-defined]
+    owner: Mapped["User"] = relationship(foreign_keys=[owner_id], lazy="raise")  # type: ignore[name-defined]
 
 
 class StoreImage(Base):

@@ -3,11 +3,14 @@ from collections.abc import Callable
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
+from app.models.store_document import StoreDocument
 from app.models.user import User, UserRole
+from app.repositories.store_repository import StoreRepository
 from app.repositories.user_repository import UserRepository
 
 bearer_scheme = HTTPBearer()
@@ -56,3 +59,28 @@ def require_role(*roles: UserRole) -> Callable:
         return user
 
     return role_checker
+
+
+async def require_merchant_with_documents(
+    user: User = Depends(require_role(UserRole.MERCHANT)),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Dependency that ensures the merchant has uploaded at least one document."""
+    repo = StoreRepository(db)
+    store = await repo.find_by_owner(user.id)
+    if not store:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Store not found",
+        )
+    result = await db.execute(
+        select(func.count())
+        .select_from(StoreDocument)
+        .where(StoreDocument.store_id == store.id)
+    )
+    if result.scalar_one() == 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Documents required. Please upload your business documents.",
+        )
+    return user

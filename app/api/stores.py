@@ -7,7 +7,7 @@ from fastapi import Form
 
 from app.core.database import get_db
 from app.core.storage import delete_image, upload_document, upload_image, validate_document, validate_image
-from app.middleware.auth import require_role
+from app.middleware.auth import require_merchant_with_documents, require_role
 from app.models.store_document import DocumentType, StoreDocument
 from app.models.user import User, UserRole
 from app.repositories.store_repository import StoreRepository
@@ -42,7 +42,7 @@ async def get_my_store(
 @router.put("/me", response_model=StoreResponse)
 async def update_my_store(
     body: StoreUpdateRequest,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_merchant_store(user, db)
@@ -64,7 +64,7 @@ async def update_my_store(
 @router.post("/me/logo", response_model=StoreResponse)
 async def upload_logo(
     file: UploadFile,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_merchant_store(user, db)
@@ -84,7 +84,7 @@ async def upload_logo(
 @router.post("/me/cover", response_model=StoreResponse)
 async def upload_cover(
     file: UploadFile,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_merchant_store(user, db)
@@ -104,7 +104,7 @@ async def upload_cover(
 @router.post("/me/images", response_model=StoreImageResponse)
 async def add_gallery_image(
     file: UploadFile,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_merchant_store(user, db)
@@ -121,7 +121,7 @@ async def add_gallery_image(
 @router.delete("/me/images/{image_id}", response_model=MessageResponse)
 async def delete_gallery_image(
     image_id: uuid.UUID,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_merchant_store(user, db)

@@ -5,10 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.storage import delete_image, upload_image, validate_image
-from app.middleware.auth import require_role
+from app.middleware.auth import require_merchant_with_documents
 from app.models.menu_item import MenuItemStatus
 from app.models.store import MerchantType
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.repositories.menu_repository import MenuRepository
 from app.repositories.store_repository import StoreRepository
 from app.schemas.auth import MessageResponse
@@ -39,7 +39,7 @@ async def _get_store_and_menu_repo(user: User, db: AsyncSession):
 
 @router.get("/categories", response_model=list[CategoryResponse])
 async def list_categories(
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_store_and_menu_repo(user, db)
@@ -49,7 +49,7 @@ async def list_categories(
 @router.post("/categories", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
 async def create_category(
     body: CategoryCreateRequest,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_store_and_menu_repo(user, db)
@@ -60,7 +60,7 @@ async def create_category(
 async def update_category(
     category_id: uuid.UUID,
     body: CategoryUpdateRequest,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_store_and_menu_repo(user, db)
@@ -73,7 +73,7 @@ async def update_category(
 @router.delete("/categories/{category_id}", response_model=MessageResponse)
 async def delete_category(
     category_id: uuid.UUID,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_store_and_menu_repo(user, db)
@@ -94,7 +94,7 @@ async def list_items(
     search: str | None = None,
     offset: int = 0,
     limit: int = 50,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_store_and_menu_repo(user, db)
@@ -118,7 +118,7 @@ def _strip_type_fields(data: dict, merchant_type: MerchantType) -> dict:
 @router.post("/items", response_model=MenuItemResponse, status_code=status.HTTP_201_CREATED)
 async def create_item(
     body: MenuItemCreateRequest,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_store_and_menu_repo(user, db)
@@ -136,7 +136,7 @@ async def create_item(
 async def update_item(
     item_id: uuid.UUID,
     body: MenuItemUpdateRequest,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_store_and_menu_repo(user, db)
@@ -150,7 +150,7 @@ async def update_item(
 @router.delete("/items/{item_id}", response_model=MessageResponse)
 async def delete_item(
     item_id: uuid.UUID,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_store_and_menu_repo(user, db)
@@ -175,7 +175,7 @@ MIN_ITEM_IMAGES_FOR_ACTIVE = 3
 async def upload_item_image(
     item_id: uuid.UUID,
     file: UploadFile,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_store_and_menu_repo(user, db)
@@ -209,7 +209,7 @@ async def upload_item_image(
 async def delete_item_image(
     item_id: uuid.UUID,
     image_id: uuid.UUID,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_store_and_menu_repo(user, db)
@@ -236,7 +236,7 @@ async def delete_item_image(
 async def update_item_status(
     item_id: uuid.UUID,
     body: MenuItemStatusRequest,
-    user: User = Depends(require_role(UserRole.MERCHANT)),
+    user: User = Depends(require_merchant_with_documents),
     db: AsyncSession = Depends(get_db),
 ):
     store, repo = await _get_store_and_menu_repo(user, db)

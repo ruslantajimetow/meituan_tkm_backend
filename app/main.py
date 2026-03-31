@@ -1,7 +1,10 @@
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.addresses import router as addresses_router
 from app.api.admin import router as admin_router
@@ -17,7 +20,10 @@ from app.api.ratings import router as ratings_router
 from app.api.stores import router as stores_router
 from app.api.ws import router as ws_router
 from app.core.config import settings
+from app.core.errors import Errors
 from app.core.redis import redis_client
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -31,6 +37,25 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    """Return the first validation error as a user-readable message."""
+    errors = exc.errors()
+    first = errors[0] if errors else {}
+    field = " → ".join(str(loc) for loc in first.get("loc", [])[1:])
+    msg = first.get("msg", "Invalid input.")
+    detail = {"code": "VALIDATION_ERROR", "message": f"{field}: {msg}" if field else msg}
+    return JSONResponse(status_code=422, content={"detail": detail})
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONResponse:
+    """Catch-all for unhandled exceptions — log the traceback, return a safe message."""
+    logger.exception("Unhandled exception: %s", exc)
+    return JSONResponse(status_code=500, content={"detail": Errors.internal()})
+
 
 app.add_middleware(
     CORSMiddleware,
