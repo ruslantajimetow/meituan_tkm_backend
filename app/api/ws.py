@@ -1,4 +1,5 @@
 import logging
+import time
 import uuid
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -25,6 +26,7 @@ async def websocket_endpoint(websocket: WebSocket):
         return
 
     user_id = uuid.UUID(payload["sub"])
+    connected_at = time.time()
     await ws_manager.connect(user_id, websocket)
 
     try:
@@ -34,8 +36,10 @@ async def websocket_endpoint(websocket: WebSocket):
             if data == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect as e:
-        logger.info("WS closed: user=%s code=%s reason=%s", user_id, e.code, e.reason)
+        duration = round(time.time() - connected_at, 1)
+        logger.info("WS closed: user=%s code=%s reason=%s duration=%ss", user_id, e.code, e.reason, duration)
         ws_manager.disconnect(user_id, websocket)
     except Exception as e:
-        logger.warning("WS error: user=%s error=%s", user_id, e)
+        duration = round(time.time() - connected_at, 1)
+        logger.warning("WS error: user=%s error=%s duration=%ss", user_id, e, duration)
         ws_manager.disconnect(user_id, websocket)
