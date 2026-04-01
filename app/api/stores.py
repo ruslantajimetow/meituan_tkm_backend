@@ -69,8 +69,12 @@ async def update_print_server_url(
     db: AsyncSession = Depends(get_db),
 ):
     """Register the Windows print agent's URL so the backend can send print jobs."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("[PRINT-AGENT] Registering print server URL: %s for user: %s", body.print_server_url, user.id)
     store, repo = await _get_merchant_store(user, db)
     updated = await repo.update(store, print_server_url=body.print_server_url)
+    logger.info("[PRINT-AGENT] Print server URL saved: %s for store: %s", updated.print_server_url, store.id)
     return updated
 
 
