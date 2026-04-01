@@ -30,12 +30,15 @@ class ConnectionManager:
 
     async def send_to_user(self, user_id: uuid.UUID, message: dict) -> None:
         connections = self._connections.get(user_id, [])
+        logger.info(f"WS send_to_user: user={user_id}, connections={len(connections)}, type={message.get('type')}")
         payload = json.dumps(message, default=str)
         dead = []
         for ws in connections:
             try:
                 await ws.send_text(payload)
-            except Exception:
+                logger.info(f"WS sent to user={user_id}")
+            except Exception as e:
+                logger.warning(f"WS send failed for user={user_id}: {e}")
                 dead.append(ws)
         for ws in dead:
             self.disconnect(user_id, ws)
