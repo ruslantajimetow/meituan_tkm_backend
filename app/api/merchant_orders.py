@@ -132,7 +132,7 @@ async def reprint_order_receipt(
             detail=Errors.order_already_cancelled(),
         )
 
-    printed = await print_order_receipt(order)
+    printed = await print_order_receipt(order, store.print_server_url)
 
     # Auto-receive if still pending and print succeeded
     if printed and order.status == OrderStatus.PENDING:
