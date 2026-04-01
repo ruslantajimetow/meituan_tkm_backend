@@ -33,7 +33,9 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             if data == "ping":
                 await websocket.send_text("pong")
-    except WebSocketDisconnect:
+    except WebSocketDisconnect as e:
+        logger.info("WS closed: user=%s code=%s reason=%s", user_id, e.code, e.reason)
         ws_manager.disconnect(user_id, websocket)
-    except Exception:
+    except Exception as e:
+        logger.warning("WS error: user=%s error=%s", user_id, e)
         ws_manager.disconnect(user_id, websocket)
