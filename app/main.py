@@ -1,5 +1,15 @@
 import logging
+import logging.config
 from contextlib import asynccontextmanager
+
+logging.config.dictConfig({
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "default": {"class": "logging.StreamHandler", "stream": "ext://sys.stdout"},
+    },
+    "root": {"handlers": ["default"], "level": "INFO"},
+})
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
