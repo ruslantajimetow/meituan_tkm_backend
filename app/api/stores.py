@@ -13,6 +13,7 @@ from app.models.user import User, UserRole
 from app.repositories.store_repository import StoreRepository
 from app.schemas.auth import MessageResponse
 from app.schemas.store import (
+    PrintServerUrlRequest,
     StoreDocumentResponse,
     StoreImageResponse,
     StoreResponse,
@@ -58,6 +59,18 @@ async def update_my_store(
         )
 
     updated = await repo.update(store, **update_data)
+    return updated
+
+
+@router.put("/me/print-server-url", response_model=StoreResponse)
+async def update_print_server_url(
+    body: PrintServerUrlRequest,
+    user: User = Depends(require_role(UserRole.MERCHANT)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Register the Windows print agent's URL so the backend can send print jobs."""
+    store, repo = await _get_merchant_store(user, db)
+    updated = await repo.update(store, print_server_url=body.print_server_url)
     return updated
 
 

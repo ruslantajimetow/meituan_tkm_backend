@@ -19,6 +19,10 @@ class StoreDocumentResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PrintServerUrlRequest(BaseModel):
+    print_server_url: str = Field(min_length=1, max_length=255)
+
+
 class StoreUpdateRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
     description: str | None = None
@@ -73,6 +77,7 @@ class StoreResponse(BaseModel):
     # Store-only
     store_category: str | None
     has_delivery_only: bool | None
+    print_server_url: str | None
     images: list[StoreImageResponse]
     created_at: datetime
     updated_at: datetime
