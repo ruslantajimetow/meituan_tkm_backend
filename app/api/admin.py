@@ -10,7 +10,7 @@ from app.models.store import StoreStatus
 from app.models.user import User, UserRole
 from app.repositories.store_repository import StoreRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.admin import StoreStatusUpdateRequest, UserActiveUpdateRequest
+from app.schemas.admin import AdminStoreDetailResponse, StoreStatusUpdateRequest, UserActiveUpdateRequest
 from app.schemas.auth import MessageResponse, UserResponse
 from app.schemas.store import StoreResponse
 from app.services.notification_service import NotificationService
@@ -31,14 +31,14 @@ async def list_stores(
     return await repo.list_stores(status=store_status, search=search, offset=offset, limit=limit)
 
 
-@router.get("/stores/{store_id}", response_model=StoreResponse)
+@router.get("/stores/{store_id}", response_model=AdminStoreDetailResponse)
 async def get_store(
     store_id: uuid.UUID,
     _user: User = Depends(require_role(UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ):
     repo = StoreRepository(db)
-    store = await repo.find_by_id(store_id)
+    store = await repo.find_by_id_with_details(store_id)
     if not store:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Store not found"

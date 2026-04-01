@@ -2,6 +2,7 @@ import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from redis.asyncio import Redis
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -9,6 +10,7 @@ from app.core.redis import get_redis
 from app.middleware.auth import get_current_user
 from app.models.notification import NotificationType
 from app.models.store import MerchantType
+from app.models.store_document import StoreDocument
 from app.models.user import User, UserRole
 from app.repositories.store_repository import StoreRepository
 from app.repositories.user_repository import UserRepository
@@ -220,5 +222,30 @@ async def logout(body: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserResponse)
-async def me(user: User = Depends(get_current_user)):
-    return user
+async def me(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    has_documents = False
+    if user.role == UserRole.MERCHANT:
+        repo = StoreRepository(db)
+        store = await repo.find_by_owner(user.id)
+        if store:
+            result = await db.execute(
+                select(func.count())
+                .select_from(StoreDocument)
+                .where(StoreDocument.store_id == store.id)
+            )
+            has_documents = result.scalar_one() > 0
+
+    return UserResponse(
+        id=user.id,
+        phone=user.phone,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        is_active=user.is_active,
+        phone_verified=user.phone_verified,
+        has_documents=has_documents,
+        created_at=user.created_at,
+    )

@@ -20,6 +20,21 @@ class StoreRepository:
         )
         return result.scalar_one_or_none()
 
+    async def find_by_id_with_details(self, store_id: uuid.UUID) -> Store | None:
+        """Load store with images, documents, and owner — for the admin detail view."""
+        from app.models.user import User
+
+        result = await self._db.execute(
+            select(Store)
+            .options(
+                selectinload(Store.images),
+                selectinload(Store.documents),
+                selectinload(Store.owner),
+            )
+            .where(Store.id == store_id)
+        )
+        return result.scalar_one_or_none()
+
     async def find_by_owner(self, owner_id: uuid.UUID) -> Store | None:
         result = await self._db.execute(
             select(Store)
@@ -221,7 +236,6 @@ class StoreRepository:
         *,
         lat: float,
         lng: float,
-        radius_km: float = 50.0,
         merchant_type: MerchantType | None = None,
         search: str | None = None,
         cuisine_type: str | None = None,
@@ -254,37 +268,13 @@ class StoreRepository:
             )
         ).label("distance_km")
 
-        # NULL-coordinate stores sort last
-        has_coords = case(
-            (Store.latitude.is_(None), 1),
-            else_=0,
-        )
+        # Stores without coordinates sort last
+        has_coords = case((Store.latitude.is_(None), 1), else_=0)
 
         query = (
             select(Store, haversine)
             .options(selectinload(Store.images))
-            .where(
-                *filters,
-                # Only apply radius filter to stores with coords; include all NULL-coord stores
-                (Store.latitude.is_(None))
-                | (
-                    6371.0
-                    * func.acos(
-                        func.least(
-                            1.0,
-                            func.greatest(
-                                -1.0,
-                                func.cos(func.radians(lat))
-                                * func.cos(func.radians(Store.latitude))
-                                * func.cos(func.radians(Store.longitude) - func.radians(lng))
-                                + func.sin(func.radians(lat))
-                                * func.sin(func.radians(Store.latitude)),
-                            ),
-                        )
-                    )
-                    <= radius_km
-                ),
-            )
+            .where(*filters)
             .order_by(has_coords, haversine)
             .offset(offset)
             .limit(limit)
@@ -299,7 +289,6 @@ class StoreRepository:
         *,
         lat: float,
         lng: float,
-        radius_km: float = 50.0,
         merchant_type: MerchantType | None = None,
         search: str | None = None,
         cuisine_type: str | None = None,
@@ -311,31 +300,7 @@ class StoreRepository:
             cuisine_type=cuisine_type,
             store_category=store_category,
         )
-        query = (
-            select(func.count())
-            .select_from(Store)
-            .where(
-                *filters,
-                (Store.latitude.is_(None))
-                | (
-                    6371.0
-                    * func.acos(
-                        func.least(
-                            1.0,
-                            func.greatest(
-                                -1.0,
-                                func.cos(func.radians(lat))
-                                * func.cos(func.radians(Store.latitude))
-                                * func.cos(func.radians(Store.longitude) - func.radians(lng))
-                                + func.sin(func.radians(lat))
-                                * func.sin(func.radians(Store.latitude)),
-                            ),
-                        )
-                    )
-                    <= radius_km
-                ),
-            )
-        )
+        query = select(func.count()).select_from(Store).where(*filters)
         result = await self._db.execute(query)
         return result.scalar_one()
 

@@ -21,6 +21,9 @@ def is_store_open(
     if opening_time is None or closing_time is None:
         return False
 
+    if opening_time == closing_time:
+        return True  # same time means open 24 hours
+
     now = current_tmt_time()
 
     if opening_time <= closing_time:

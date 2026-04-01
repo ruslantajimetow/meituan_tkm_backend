@@ -100,6 +100,7 @@ class UserResponse(BaseModel):
     role: UserRole
     is_active: bool
     phone_verified: bool
+    has_documents: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

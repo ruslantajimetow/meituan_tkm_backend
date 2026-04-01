@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.errors import Errors
 from app.middleware.auth import require_role
 from app.models.menu_item import MenuItem, MenuItemStatus
 from app.models.notification import NotificationType
@@ -34,14 +35,11 @@ async def create_order(
     result = await db.execute(select(Store).where(Store.id == body.store_id))
     store = result.scalar_one_or_none()
     if not store:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Store not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=Errors.store_not_found())
     if store.status != StoreStatus.APPROVED:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Store is not approved")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=Errors.store_not_approved())
     if not is_store_open(store.opening_time, store.closing_time):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Store is currently closed",
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=Errors.store_closed())
 
     # Fetch all requested menu items in one query
     requested_ids = [item.menu_item_id for item in body.items]
@@ -56,12 +54,12 @@ async def create_order(
         if not menu_item:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Menu item {req_item.menu_item_id} not found in this store",
+                detail=Errors.menu_item_not_found(str(req_item.menu_item_id)),
             )
         if menu_item.status != MenuItemStatus.ACTIVE:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Menu item '{menu_item.name}' is not available",
+                detail=Errors.menu_item_unavailable(menu_item.name),
             )
 
     # Compute totals with snapshotted prices
@@ -84,7 +82,7 @@ async def create_order(
     if subtotal < Decimal(str(store.min_order)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Minimum order amount is {store.min_order}",
+            detail=Errors.min_order_not_met(float(store.min_order)),
         )
 
     delivery_fee = Decimal(str(store.delivery_fee))

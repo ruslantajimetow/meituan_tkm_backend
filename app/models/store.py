@@ -51,11 +51,15 @@ class Store(Base):
     store_category: Mapped[str | None] = mapped_column(String(100))
     has_delivery_only: Mapped[bool | None] = mapped_column(Boolean)
 
+    # Print server
+    print_server_url: Mapped[str | None] = mapped_column(String(255))
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     images: Mapped[list["StoreImage"]] = relationship(back_populates="store", cascade="all, delete-orphan", order_by="StoreImage.sort_order")
     documents: Mapped[list["StoreDocument"]] = relationship(back_populates="store", cascade="all, delete-orphan", order_by="StoreDocument.created_at")  # type: ignore[name-defined]
+    owner: Mapped["User"] = relationship(foreign_keys=[owner_id], lazy="raise")  # type: ignore[name-defined]
 
 
 class StoreImage(Base):

@@ -63,7 +63,6 @@ async def list_stores(
 async def list_nearby_stores(
     lat: float = Query(..., ge=-90, le=90),
     lng: float = Query(..., ge=-180, le=180),
-    radius_km: float = Query(50.0, ge=1, le=200),
     merchant_type: MerchantType | None = None,
     search: str | None = None,
     cuisine_type: str | None = None,
@@ -76,7 +75,6 @@ async def list_nearby_stores(
     rows = await repo.list_nearby(
         lat=lat,
         lng=lng,
-        radius_km=radius_km,
         merchant_type=merchant_type,
         search=search,
         cuisine_type=cuisine_type,
@@ -87,7 +85,6 @@ async def list_nearby_stores(
     total = await repo.count_nearby(
         lat=lat,
         lng=lng,
-        radius_km=radius_km,
         merchant_type=merchant_type,
         search=search,
         cuisine_type=cuisine_type,
