@@ -104,7 +104,7 @@ async def create_order(
     )
 
     # Print receipt and auto-receive if successful
-    printed = await print_order_receipt(order)
+    printed = await print_order_receipt(order, store.print_server_url)
     if printed:
         order = await repo.update_status(order, OrderStatus.RECEIVED)
         logger.info("Order %s auto-received after successful print", order.id)

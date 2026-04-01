@@ -16,8 +16,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def print_order_receipt(order: Order) -> bool:
+async def print_order_receipt(order: Order, print_server_url: str | None = None) -> bool:
     """Generate and print a receipt for the given order.
+
+    Uses the store's registered print_server_url if provided, otherwise falls
+    back to the PRINT_AGENT_URL env var.
 
     Returns True if print was submitted successfully, False otherwise.
     Never raises — all errors are logged and swallowed.
@@ -25,6 +28,8 @@ async def print_order_receipt(order: Order) -> bool:
     if not settings.print_enabled:
         logger.info("Printing disabled, skipping receipt for order %s", order.id)
         return False
+
+    target_url = print_server_url or settings.print_agent_url
 
     try:
         pdf_bytes = generate_receipt_pdf(order)
@@ -35,7 +40,7 @@ async def print_order_receipt(order: Order) -> bool:
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, read=30.0)) as client:
             resp = await client.post(
-                f"{settings.print_agent_url}/print",
+                f"{target_url}/print",
                 content=pdf_bytes,
                 headers={"Content-Type": "application/pdf"},
             )
