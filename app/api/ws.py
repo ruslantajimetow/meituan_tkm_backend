@@ -31,9 +31,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            # Keep connection alive; client can send pings
             data = await websocket.receive_text()
             if data == "ping":
+                logger.info("WS ping received from user=%s", user_id)
                 await websocket.send_text("pong")
     except WebSocketDisconnect as e:
         duration = round(time.time() - connected_at, 1)
